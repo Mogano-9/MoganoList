@@ -20,6 +20,7 @@
             secondary: { DEFAULT: 'hsl(var(--secondary))', foreground: 'hsl(var(--secondary-foreground))' },
             muted: { DEFAULT: 'hsl(var(--muted))', foreground: 'hsl(var(--muted-foreground))' },
             accent: { DEFAULT: 'hsl(var(--accent))', foreground: 'hsl(var(--accent-foreground))' },
+            danger: { DEFAULT: 'hsl(var(--danger))', foreground: 'hsl(var(--danger-foreground))' },
             card: { DEFAULT: 'hsl(var(--card))', foreground: 'hsl(var(--card-foreground))' }
           },
           borderRadius: {
@@ -53,6 +54,8 @@
       --muted-foreground: 30 8% 40%;
       --accent: 44 72% 89%;
       --accent-foreground: 30 14% 15%;
+      --danger: 355 62% 40%;
+      --danger-foreground: 0 0% 100%;
       --border: 36 18% 87%;
       --input: 36 18% 87%;
       --ring: 158 30% 24%;
@@ -144,11 +147,18 @@
     <section id="task-board" class="container pb-14">
       <div class="rounded-lg border border-border bg-card shadow-sm">
         <div class="p-4 md:p-5 border-b border-border">
-          <form id="add-form" class="flex items-center gap-2" autocomplete="off">
+          <form id="add-form" class="flex flex-col md:flex-row md:items-center gap-2" autocomplete="off">
             <input id="task-input" type="text" maxlength="120" placeholder="写下一件今天要做的事…"
                    class="field flex-1 h-11 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground" />
-            <button type="submit"
-                    class="field h-11 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">添加</button>
+            <div class="flex items-center gap-2">
+              <label for="due-input" class="field flex items-center gap-1.5 h-11 shrink-0 rounded-md border border-input bg-background px-2.5 text-xs text-muted-foreground">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg>
+                <span class="hidden md:inline">截止</span>
+                <input id="due-input" type="date" class="field h-7 rounded-sm border border-input bg-background px-1.5 text-xs text-foreground" aria-label="截止日期" />
+              </label>
+              <button type="submit"
+                      class="field h-11 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">添加</button>
+            </div>
           </form>
         </div>
 
@@ -181,7 +191,7 @@
   <footer id="site-footer" class="border-t border-border">
     <div class="container py-5 flex flex-col md:flex-row md:items-center justify-between gap-2">
       <p class="text-xs text-muted-foreground">Mogano List · 一个不打扰你的每日清单</p>
-      <p class="text-xs text-muted-foreground">双击任务文字可直接修改</p>
+      <p class="text-xs text-muted-foreground">双击任务文字可直接修改 · 悬停任务可设置截止日期</p>
     </div>
   </footer>
 
@@ -192,8 +202,12 @@
       </button>
       <div class="min-w-0 flex-1">
         <p class="task-text text-sm leading-6 break-words"></p>
+        <div class="task-meta mt-1"></div>
       </div>
-      <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+      <div class="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+        <button type="button" class="due-btn field h-7 w-7 grid place-items-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground" aria-label="设置截止日期">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg>
+        </button>
         <button type="button" class="edit field h-7 w-7 grid place-items-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground" aria-label="编辑">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
         </button>
@@ -227,6 +241,7 @@
         progressHint: document.getElementById('progress-hint'),
         form: document.getElementById('add-form'),
         input: document.getElementById('task-input'),
+        dueInput: document.getElementById('due-input'),
         list: document.getElementById('task-list'),
         empty: document.getElementById('empty-state'),
         emptyTitle: document.getElementById('empty-title'),
@@ -314,9 +329,28 @@
         el.dayWeekday.textContent = WEEKDAYS[d.getDay()] + ' · ' + state.date;
       }
 
+      function dueLabel(key) {
+        var d = fromKey(key);
+        var diff = Math.round((fromKey(key) - fromKey(toKey(new Date()))) / 86400000);
+        if (diff === 0) return '今天';
+        if (diff === 1) return '明天';
+        if (diff === -1) return '昨天';
+        return (d.getMonth() + 1) + '月' + d.getDate() + '日';
+      }
+
+      function dueTone(task) {
+        if (!task.due) return 'none';
+        if (task.done) return 'done';
+        var todayKey = toKey(new Date());
+        if (task.due < todayKey) return 'overdue';
+        if (task.due === todayKey) return 'today';
+        return 'future';
+      }
+
       function renderProgress(list) {
         var total = list.length;
         var done = list.filter(function (t) { return t.done; }).length;
+        var overdue = list.filter(function (t) { return !t.done && t.due && t.due < toKey(new Date()); }).length;
         var pct = total ? Math.round((done / total) * 100) : 0;
 
         el.doneCount.textContent = String(done);
@@ -327,6 +361,8 @@
           el.progressHint.textContent = '还没有待办，先写一条吧';
         } else if (done === total) {
           el.progressHint.textContent = '全部完成，今天很利落。';
+        } else if (overdue > 0) {
+          el.progressHint.textContent = '还剩 ' + (total - done) + ' 件待办，其中 ' + overdue + ' 件已逾期';
         } else {
           el.progressHint.textContent = '还剩 ' + (total - done) + ' 件待办';
         }
@@ -367,6 +403,29 @@
             text.classList.add('text-muted-foreground');
           }
 
+          var meta = node.querySelector('.task-meta');
+          if (task.due) {
+            var tone = dueTone(task);
+            var chip = document.createElement('span');
+            chip.className = 'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs tabular-nums';
+            if (tone === 'overdue') {
+              chip.classList.add('border-danger', 'text-danger', 'font-medium');
+              chip.textContent = '截止 ' + dueLabel(task.due) + ' · 已逾期';
+            } else if (tone === 'today') {
+              chip.classList.add('border-border', 'bg-accent', 'text-accent-foreground', 'font-medium');
+              chip.textContent = '截止 今天';
+            } else if (tone === 'done') {
+              chip.classList.add('border-border', 'text-muted-foreground');
+              chip.textContent = '截止 ' + dueLabel(task.due);
+            } else {
+              chip.classList.add('border-border', 'text-muted-foreground');
+              chip.textContent = '截止 ' + dueLabel(task.due);
+            }
+            meta.appendChild(chip);
+          } else {
+            meta.classList.add('hidden');
+          }
+
           var toggle = node.querySelector('.toggle');
           toggle.setAttribute('aria-label', task.done ? '标记为未完成' : '标记完成');
           if (task.done) {
@@ -399,12 +458,13 @@
         el.clearDone.classList.toggle('cursor-not-allowed', el.clearDone.disabled);
       }
 
-      function addTask(text) {
+      function addTask(text, due) {
         var list = tasksOf(state.date);
         list.push({
           id: 't' + Date.now() + Math.random().toString(16).slice(2, 6),
           text: text,
           done: false,
+          due: due || null,
           createdAt: Date.now()
         });
         saveTasks(state.date, list);
@@ -462,6 +522,47 @@
         input.addEventListener('blur', function () { commit(true); });
       }
 
+      function startDueEdit(node, task) {
+        var meta = node.querySelector('.task-meta');
+        meta.classList.remove('hidden');
+        meta.innerHTML = '';
+
+        var input = document.createElement('input');
+        input.type = 'date';
+        input.value = task.due || '';
+        input.className = 'field h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground';
+        input.setAttribute('aria-label', '截止日期');
+
+        var clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.textContent = '清除';
+        clearBtn.className = 'field h-8 px-2 rounded-md text-xs text-muted-foreground hover:bg-secondary hover:text-foreground';
+
+        meta.appendChild(input);
+        meta.appendChild(clearBtn);
+        input.focus();
+
+        var finished = false;
+        function commit(value) {
+          if (finished) return;
+          finished = true;
+          updateTask(task.id, { due: value || null });
+        }
+
+        input.addEventListener('change', function () { commit(input.value); });
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') commit(input.value);
+          if (e.key === 'Escape') { finished = true; render(); }
+        });
+        input.addEventListener('blur', function () {
+          setTimeout(function () { if (!finished) commit(input.value); }, 120);
+        });
+        clearBtn.addEventListener('mousedown', function (e) {
+          e.preventDefault();
+          commit(null);
+        });
+      }
+
       el.form.addEventListener('submit', function (e) {
         e.preventDefault();
         var text = el.input.value.trim();
@@ -469,14 +570,16 @@
           el.input.focus();
           return;
         }
-        addTask(text);
+        addTask(text, el.dueInput.value);
         el.input.value = '';
+        el.dueInput.value = '';
         el.input.focus();
       });
 
       el.list.addEventListener('click', function (e) {
         var toggle = e.target.closest('.toggle');
         var editBtn = e.target.closest('.edit');
+        var dueBtn = e.target.closest('.due-btn');
         var removeBtn = e.target.closest('.remove');
         var node = e.target.closest('.task-item');
         if (!node) return;
@@ -487,6 +590,7 @@
         if (toggle) updateTask(id, { done: !task.done });
         if (removeBtn) removeTask(id);
         if (editBtn) startEdit(node, task);
+        if (dueBtn) startDueEdit(node, task);
       });
 
       el.list.addEventListener('dblclick', function (e) {
