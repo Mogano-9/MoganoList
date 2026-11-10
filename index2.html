@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mogano List · 每日待办清单</title>
+  <script src="https://resource-static.cdn.bcebos.com/common/tailwindcss/3.4.16.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        container: { center: true, padding: '1.5rem', screens: { '2xl': '1080px' } },
+        extend: {
+          colors: {
+            border: 'hsl(var(--border))',
+            input: 'hsl(var(--input))',
+            ring: 'hsl(var(--ring))',
+            background: 'hsl(var(--background))',
+            foreground: 'hsl(var(--foreground))',
+            primary: { DEFAULT: 'hsl(var(--primary))', foreground: 'hsl(var(--primary-foreground))' },
+            secondary: { DEFAULT: 'hsl(var(--secondary))', foreground: 'hsl(var(--secondary-foreground))' },
+            muted: { DEFAULT: 'hsl(var(--muted))', foreground: 'hsl(var(--muted-foreground))' },
+            accent: { DEFAULT: 'hsl(var(--accent))', foreground: 'hsl(var(--accent-foreground))' },
+            card: { DEFAULT: 'hsl(var(--card))', foreground: 'hsl(var(--card-foreground))' }
+          },
+          borderRadius: {
+            lg: 'var(--radius)',
+            md: 'calc(var(--radius) - 2px)',
+            sm: 'calc(var(--radius) - 4px)'
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"PingFang SC"', '"Microsoft YaHei"', '"Helvetica Neue"', 'Arial', 'sans-serif']
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* ===== FONT-FACE:BEGIN ===== */
+    /* ===== FONT-FACE:END ===== */
+
+    /* ===== DESIGN-TOKENS:BEGIN ===== */
+    :root {
+      --radius: 0.75rem;
+      --background: 40 26% 97%;
+      --foreground: 30 14% 15%;
+      --card: 0 0% 100%;
+      --card-foreground: 30 14% 15%;
+      --primary: 158 30% 24%;
+      --primary-foreground: 40 30% 96%;
+      --secondary: 40 22% 93%;
+      --secondary-foreground: 30 14% 15%;
+      --muted: 40 20% 94%;
+      --muted-foreground: 30 8% 40%;
+      --accent: 44 72% 89%;
+      --accent-foreground: 30 14% 15%;
+      --border: 36 18% 87%;
+      --input: 36 18% 87%;
+      --ring: 158 30% 24%;
+    }
+    /* ===== DESIGN-TOKENS:END ===== */
+
+    /* ===== APP-CSS:BEGIN ===== */
+    html { scroll-behavior: smooth; }
+    body {
+      background-image:
+        radial-gradient(hsl(36 18% 87% / .55) 1px, transparent 1px);
+      background-size: 22px 22px;
+      background-position: -1px -1px;
+    }
+    .task-item { animation: rise .28s ease-out both; }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .task-item.removing { animation: fade .18s ease-in forwards; }
+    @keyframes fade { to { opacity: 0; transform: translateX(8px); } }
+    .task-text { transition: color .2s ease, text-decoration-color .2s ease; }
+    .done .task-text { text-decoration: line-through; text-decoration-thickness: 1px; }
+    .toggle-mark { transition: background-color .18s ease, border-color .18s ease, transform .12s ease; }
+    .toggle-mark:active { transform: scale(.9); }
+    .progress-fill { transition: width .32s ease-out; }
+    .field:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+    ::selection { background: hsl(var(--accent)); }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+      }
+    }
+    /* ===== APP-CSS:END ===== */
+  </style>
+</head>
+<body class="bg-background text-foreground antialiased min-h-screen flex flex-col">
+
+  <header id="site-header" class="border-b border-border">
+    <div class="container flex items-center justify-between gap-4 py-4">
+      <div class="flex items-center gap-3">
+        <span class="grid place-items-center h-9 w-9 rounded-md bg-primary text-primary-foreground font-semibold text-sm tracking-tight">M</span>
+        <div class="leading-tight">
+          <p class="text-base font-semibold tracking-tight">Mogano List</p>
+          <p class="text-xs text-muted-foreground">每天要做什么，记在这里</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-1.5">
+        <button id="prev-day" type="button" aria-label="前一天"
+                class="field h-9 w-9 grid place-items-center rounded-md border border-border text-muted-foreground hover:bg-secondary hover:text-foreground">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <button id="today-jump" type="button"
+                class="field h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-secondary">今天</button>
+        <button id="next-day" type="button" aria-label="后一天"
+                class="field h-9 w-9 grid place-items-center rounded-md border border-border text-muted-foreground hover:bg-secondary hover:text-foreground">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1">
+    <section id="day-overview" class="container pt-10 pb-6">
+      <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+        <div>
+          <p id="day-relative" class="text-xs font-medium tracking-widest uppercase text-muted-foreground">今天</p>
+          <h1 id="day-title" class="mt-2 text-3xl md:text-4xl font-semibold tracking-tight">11 月 10 日</h1>
+          <p id="day-weekday" class="mt-1.5 text-sm text-muted-foreground">星期一</p>
+        </div>
+
+        <div class="w-full md:w-64">
+          <div class="flex items-baseline justify-between text-sm">
+            <span class="text-muted-foreground">完成进度</span>
+            <span class="tabular-nums font-medium"><span id="done-count">0</span> / <span id="total-count">0</span></span>
+          </div>
+          <div class="mt-2 h-2 w-full rounded-full bg-secondary overflow-hidden">
+            <div id="progress-fill" class="progress-fill h-full rounded-full bg-primary" style="width: 0%"></div>
+          </div>
+          <p id="progress-hint" class="mt-2 text-xs text-muted-foreground">还没有待办，先写一条吧</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="task-board" class="container pb-14">
+      <div class="rounded-lg border border-border bg-card shadow-sm">
+        <div class="p-4 md:p-5 border-b border-border">
+          <form id="add-form" class="flex items-center gap-2" autocomplete="off">
+            <input id="task-input" type="text" maxlength="120" placeholder="写下一件今天要做的事…"
+                   class="field flex-1 h-11 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground" />
+            <button type="submit"
+                    class="field h-11 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">添加</button>
+          </form>
+        </div>
+
+        <div class="flex items-center justify-between gap-3 px-4 md:px-5 py-3 border-b border-border">
+          <div id="filters" class="flex items-center gap-1" role="tablist" aria-label="筛选待办">
+            <button type="button" data-filter="all" class="filter-btn field h-8 px-3 rounded-md text-sm">全部</button>
+            <button type="button" data-filter="active" class="filter-btn field h-8 px-3 rounded-md text-sm">进行中</button>
+            <button type="button" data-filter="done" class="filter-btn field h-8 px-3 rounded-md text-sm">已完成</button>
+          </div>
+          <button id="clear-done" type="button"
+                  class="field h-8 px-2.5 rounded-md text-xs text-muted-foreground hover:bg-secondary hover:text-foreground">清除已完成</button>
+        </div>
+
+        <ul id="task-list" class="divide-y divide-border"></ul>
+
+        <div id="empty-state" class="hidden px-6 py-14 text-center">
+          <svg class="mx-auto" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: hsl(30 8% 62%)">
+            <rect x="4" y="3.5" width="16" height="17" rx="2.5"/>
+            <path d="M8 8.5h5M8 12h8M8 15.5h6"/>
+          </svg>
+          <p id="empty-title" class="mt-4 text-sm font-medium">今天还没有待办</p>
+          <p id="empty-desc" class="mt-1 text-xs text-muted-foreground">在上面的输入框写一条，按回车就能添加</p>
+        </div>
+      </div>
+
+      <p class="mt-3 text-xs text-muted-foreground">数据保存在你自己的浏览器里，换设备不会同步。</p>
+    </section>
+  </main>
+
+  <footer id="site-footer" class="border-t border-border">
+    <div class="container py-5 flex flex-col md:flex-row md:items-center justify-between gap-2">
+      <p class="text-xs text-muted-foreground">Mogano List · 一个不打扰你的每日清单</p>
+      <p class="text-xs text-muted-foreground">双击任务文字可直接修改</p>
+    </div>
+  </footer>
+
+  <template id="task-template">
+    <li class="task-item group flex items-start gap-3 px-4 md:px-5 py-3.5">
+      <button type="button" class="toggle field toggle-mark mt-0.5 h-5 w-5 shrink-0 rounded-full border grid place-items-center" aria-label="标记完成">
+        <svg class="check-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+      </button>
+      <div class="min-w-0 flex-1">
+        <p class="task-text text-sm leading-6 break-words"></p>
+      </div>
+      <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+        <button type="button" class="edit field h-7 w-7 grid place-items-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground" aria-label="编辑">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
+        </button>
+        <button type="button" class="remove field h-7 w-7 grid place-items-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground" aria-label="删除">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+        </button>
+      </div>
+    </li>
+  </template>
+
+  <!-- ===== APP-JS:BEGIN ===== -->
+  <script>
+    (function () {
+      'use strict';
+
+      var STORE_KEY = 'mogano-list-v1';
+      var WEEKDAYS = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+
+      var state = {
+        date: toKey(new Date()),
+        filter: 'all'
+      };
+
+      var el = {
+        dayRelative: document.getElementById('day-relative'),
+        dayTitle: document.getElementById('day-title'),
+        dayWeekday: document.getElementById('day-weekday'),
+        doneCount: document.getElementById('done-count'),
+        totalCount: document.getElementById('total-count'),
+        progressFill: document.getElementById('progress-fill'),
+        progressHint: document.getElementById('progress-hint'),
+        form: document.getElementById('add-form'),
+        input: document.getElementById('task-input'),
+        list: document.getElementById('task-list'),
+        empty: document.getElementById('empty-state'),
+        emptyTitle: document.getElementById('empty-title'),
+        emptyDesc: document.getElementById('empty-desc'),
+        clearDone: document.getElementById('clear-done'),
+        filters: document.getElementById('filters'),
+        template: document.getElementById('task-template'),
+        prevDay: document.getElementById('prev-day'),
+        nextDay: document.getElementById('next-day'),
+        todayJump: document.getElementById('today-jump')
+      };
+
+      function toKey(d) {
+        var y = d.getFullYear();
+        var m = String(d.getMonth() + 1).padStart(2, '0');
+        var day = String(d.getDate()).padStart(2, '0');
+        return y + '-' + m + '-' + day;
+      }
+
+      function fromKey(key) {
+        var parts = key.split('-').map(Number);
+        return new Date(parts[0], parts[1] - 1, parts[2]);
+      }
+
+      function readStore() {
+        try {
+          var raw = localStorage.getItem(STORE_KEY);
+          var data = raw ? JSON.parse(raw) : {};
+          return data && typeof data === 'object' ? data : {};
+        } catch (e) {
+          return {};
+        }
+      }
+
+      function writeStore(data) {
+        try {
+          localStorage.setItem(STORE_KEY, JSON.stringify(data));
+        } catch (e) {
+          /* 存储不可用时功能仍可继续使用，只是不持久化 */
+        }
+      }
+
+      function tasksOf(key) {
+        var data = readStore();
+        var list = data[key];
+        return Array.isArray(list) ? list : [];
+      }
+
+      function saveTasks(key, list) {
+        var data = readStore();
+        if (list.length) {
+          data[key] = list;
+        } else {
+          delete data[key];
+        }
+        writeStore(data);
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function visibleTasks(list) {
+        if (state.filter === 'active') return list.filter(function (t) { return !t.done; });
+        if (state.filter === 'done') return list.filter(function (t) { return t.done; });
+        return list;
+      }
+
+      function renderDate() {
+        var d = fromKey(state.date);
+        var todayKey = toKey(new Date());
+        var diffDays = Math.round((fromKey(state.date) - fromKey(todayKey)) / 86400000);
+        var relative = '今天';
+        if (diffDays === -1) relative = '昨天';
+        else if (diffDays === 1) relative = '明天';
+        else if (diffDays < -1) relative = Math.abs(diffDays) + ' 天前';
+        else if (diffDays > 1) relative = diffDays + ' 天后';
+
+        el.dayRelative.textContent = relative;
+        el.dayTitle.textContent = (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日';
+        el.dayWeekday.textContent = WEEKDAYS[d.getDay()] + ' · ' + state.date;
+      }
+
+      function renderProgress(list) {
+        var total = list.length;
+        var done = list.filter(function (t) { return t.done; }).length;
+        var pct = total ? Math.round((done / total) * 100) : 0;
+
+        el.doneCount.textContent = String(done);
+        el.totalCount.textContent = String(total);
+        el.progressFill.style.width = pct + '%';
+
+        if (!total) {
+          el.progressHint.textContent = '还没有待办，先写一条吧';
+        } else if (done === total) {
+          el.progressHint.textContent = '全部完成，今天很利落。';
+        } else {
+          el.progressHint.textContent = '还剩 ' + (total - done) + ' 件待办';
+        }
+      }
+
+      function renderFilters() {
+        var buttons = el.filters.querySelectorAll('.filter-btn');
+        for (var i = 0; i < buttons.length; i++) {
+          var btn = buttons[i];
+          var active = btn.getAttribute('data-filter') === state.filter;
+          btn.classList.toggle('bg-primary', active);
+          btn.classList.toggle('text-primary-foreground', active);
+          btn.classList.toggle('font-medium', active);
+          btn.classList.toggle('text-muted-foreground', !active);
+          btn.classList.toggle('hover:bg-secondary', !active);
+          btn.setAttribute('aria-selected', String(active));
+        }
+      }
+
+      function render() {
+        renderDate();
+        var all = tasksOf(state.date);
+        renderProgress(all);
+        renderFilters();
+
+        var items = visibleTasks(all);
+        el.list.innerHTML = '';
+        el.list.classList.toggle('hidden', items.length === 0);
+
+        items.forEach(function (task) {
+          var node = el.template.content.firstElementChild.cloneNode(true);
+          node.dataset.id = task.id;
+          node.classList.toggle('done', !!task.done);
+
+          var text = node.querySelector('.task-text');
+          text.textContent = task.text;
+          if (task.done) {
+            text.classList.add('text-muted-foreground');
+          }
+
+          var toggle = node.querySelector('.toggle');
+          toggle.setAttribute('aria-label', task.done ? '标记为未完成' : '标记完成');
+          if (task.done) {
+            toggle.classList.add('bg-primary', 'border-primary', 'text-primary-foreground');
+          } else {
+            toggle.classList.add('border-border', 'text-transparent');
+          }
+
+          el.list.appendChild(node);
+        });
+
+        if (items.length === 0) {
+          el.empty.classList.remove('hidden');
+          if (all.length === 0) {
+            el.emptyTitle.textContent = '今天还没有待办';
+            el.emptyDesc.textContent = '在上面的输入框写一条，按回车就能添加';
+          } else if (state.filter === 'done') {
+            el.emptyTitle.textContent = '还没有完成的事';
+            el.emptyDesc.textContent = '把进行中的任务勾选掉，就会出现在这里';
+          } else {
+            el.emptyTitle.textContent = '进行中的任务已清空';
+            el.emptyDesc.textContent = '今天的待办都完成了，可以去看看已完成列表';
+          }
+        } else {
+          el.empty.classList.add('hidden');
+        }
+
+        el.clearDone.disabled = all.filter(function (t) { return t.done; }).length === 0;
+        el.clearDone.classList.toggle('opacity-40', el.clearDone.disabled);
+        el.clearDone.classList.toggle('cursor-not-allowed', el.clearDone.disabled);
+      }
+
+      function addTask(text) {
+        var list = tasksOf(state.date);
+        list.push({
+          id: 't' + Date.now() + Math.random().toString(16).slice(2, 6),
+          text: text,
+          done: false,
+          createdAt: Date.now()
+        });
+        saveTasks(state.date, list);
+        render();
+      }
+
+      function updateTask(id, patch) {
+        var list = tasksOf(state.date).map(function (t) {
+          if (t.id !== id) return t;
+          return Object.assign({}, t, patch);
+        });
+        saveTasks(state.date, list);
+        render();
+      }
+
+      function removeTask(id) {
+        var node = el.list.querySelector('[data-id="' + id + '"]');
+        var list = tasksOf(state.date).filter(function (t) { return t.id !== id; });
+        saveTasks(state.date, list);
+        if (node) {
+          node.classList.add('removing');
+          setTimeout(render, 160);
+        } else {
+          render();
+        }
+      }
+
+      function startEdit(node, task) {
+        var holder = node.querySelector('.task-text');
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.maxLength = 120;
+        input.value = task.text;
+        input.className = 'field w-full h-8 rounded-md border border-input bg-background px-2 text-sm';
+
+        holder.replaceWith(input);
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+
+        var finished = false;
+        function commit(save) {
+          if (finished) return;
+          finished = true;
+          var next = input.value.trim();
+          if (save && next && next !== task.text) {
+            updateTask(task.id, { text: next });
+          } else {
+            render();
+          }
+        }
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') commit(true);
+          if (e.key === 'Escape') commit(false);
+        });
+        input.addEventListener('blur', function () { commit(true); });
+      }
+
+      el.form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var text = el.input.value.trim();
+        if (!text) {
+          el.input.focus();
+          return;
+        }
+        addTask(text);
+        el.input.value = '';
+        el.input.focus();
+      });
+
+      el.list.addEventListener('click', function (e) {
+        var toggle = e.target.closest('.toggle');
+        var editBtn = e.target.closest('.edit');
+        var removeBtn = e.target.closest('.remove');
+        var node = e.target.closest('.task-item');
+        if (!node) return;
+        var id = node.dataset.id;
+        var task = tasksOf(state.date).filter(function (t) { return t.id === id; })[0];
+        if (!task) return;
+
+        if (toggle) updateTask(id, { done: !task.done });
+        if (removeBtn) removeTask(id);
+        if (editBtn) startEdit(node, task);
+      });
+
+      el.list.addEventListener('dblclick', function (e) {
+        var node = e.target.closest('.task-item');
+        if (!node || e.target.closest('button')) return;
+        var id = node.dataset.id;
+        var task = tasksOf(state.date).filter(function (t) { return t.id === id; })[0];
+        if (task) startEdit(node, task);
+      });
+
+      el.filters.addEventListener('click', function (e) {
+        var btn = e.target.closest('.filter-btn');
+        if (!btn) return;
+        state.filter = btn.getAttribute('data-filter');
+        render();
+      });
+
+      el.clearDone.addEventListener('click', function () {
+        if (el.clearDone.disabled) return;
+        var list = tasksOf(state.date).filter(function (t) { return !t.done; });
+        saveTasks(state.date, list);
+        render();
+      });
+
+      function shiftDay(offset) {
+        var d = fromKey(state.date);
+        d.setDate(d.getDate() + offset);
+        state.date = toKey(d);
+        render();
+      }
+
+      el.prevDay.addEventListener('click', function () { shiftDay(-1); });
+      el.nextDay.addEventListener('click', function () { shiftDay(1); });
+      el.todayJump.addEventListener('click', function () {
+        state.date = toKey(new Date());
+        render();
+      });
+
+      render();
+      el.input.focus();
+    })();
+  </script>
+  <!-- ===== APP-JS:END ===== -->
+</body>
+</html>
