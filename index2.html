@@ -162,14 +162,21 @@
           </form>
         </div>
 
-        <div class="flex items-center justify-between gap-3 px-4 md:px-5 py-3 border-b border-border">
+        <div class="flex flex-wrap items-center justify-between gap-2 px-4 md:px-5 py-3 border-b border-border">
           <div id="filters" class="flex items-center gap-1" role="tablist" aria-label="筛选待办">
             <button type="button" data-filter="all" class="filter-btn field h-8 px-3 rounded-md text-sm">全部</button>
             <button type="button" data-filter="active" class="filter-btn field h-8 px-3 rounded-md text-sm">进行中</button>
             <button type="button" data-filter="done" class="filter-btn field h-8 px-3 rounded-md text-sm">已完成</button>
           </div>
-          <button id="clear-done" type="button"
-                  class="field h-8 px-2.5 rounded-md text-xs text-muted-foreground hover:bg-secondary hover:text-foreground">清除已完成</button>
+          <div class="flex items-center gap-1.5">
+            <button id="complete-all" type="button"
+                    class="field inline-flex items-center gap-1 h-8 px-2.5 rounded-md border border-border text-xs font-medium text-foreground hover:bg-secondary">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12l4.5 4.5L15 8"/><path d="M11 16.5L13 18.5L22 8"/></svg>
+              一键完成
+            </button>
+            <button id="clear-done" type="button"
+                    class="field h-8 px-2.5 rounded-md text-xs text-muted-foreground hover:bg-secondary hover:text-foreground">清除已完成</button>
+          </div>
         </div>
 
         <ul id="task-list" class="divide-y divide-border"></ul>
@@ -247,6 +254,7 @@
         emptyTitle: document.getElementById('empty-title'),
         emptyDesc: document.getElementById('empty-desc'),
         clearDone: document.getElementById('clear-done'),
+        completeAll: document.getElementById('complete-all'),
         filters: document.getElementById('filters'),
         template: document.getElementById('task-template'),
         prevDay: document.getElementById('prev-day'),
@@ -456,6 +464,11 @@
         el.clearDone.disabled = all.filter(function (t) { return t.done; }).length === 0;
         el.clearDone.classList.toggle('opacity-40', el.clearDone.disabled);
         el.clearDone.classList.toggle('cursor-not-allowed', el.clearDone.disabled);
+
+        var activeCount = all.filter(function (t) { return !t.done; }).length;
+        el.completeAll.disabled = activeCount === 0;
+        el.completeAll.classList.toggle('opacity-40', el.completeAll.disabled);
+        el.completeAll.classList.toggle('cursor-not-allowed', el.completeAll.disabled);
       }
 
       function addTask(text, due) {
@@ -611,6 +624,15 @@
       el.clearDone.addEventListener('click', function () {
         if (el.clearDone.disabled) return;
         var list = tasksOf(state.date).filter(function (t) { return !t.done; });
+        saveTasks(state.date, list);
+        render();
+      });
+
+      el.completeAll.addEventListener('click', function () {
+        if (el.completeAll.disabled) return;
+        var list = tasksOf(state.date).map(function (t) {
+          return t.done ? t : Object.assign({}, t, { done: true });
+        });
         saveTasks(state.date, list);
         render();
       });
