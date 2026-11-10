@@ -120,15 +120,64 @@
     .cat-chip.badge-study { background-color: hsl(var(--tag-study) / .2); }
     .cat-chip.badge-health { background-color: hsl(var(--tag-health) / .2); }
     .cat-chip.badge-other { background-color: hsl(var(--tag-other) / .16); }
-    .task-item { animation: rise .28s ease-out both; }
+    .task-item { animation: rise .28s ease-out both; position: relative; }
     @keyframes rise {
       from { opacity: 0; transform: translateY(6px); }
       to { opacity: 1; transform: translateY(0); }
     }
     .task-item.removing { animation: fade .18s ease-in forwards; }
     @keyframes fade { to { opacity: 0; transform: translateX(8px); } }
-    .task-text { transition: color .2s ease, text-decoration-color .2s ease; }
+    .task-text { position: relative; transition: color .3s ease, text-decoration-color .3s ease; }
     .done .task-text { text-decoration: line-through; text-decoration-thickness: 1px; }
+    .task-text::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 50%;
+      width: 100%;
+      height: 1px;
+      background-color: currentColor;
+      transform: scaleX(0);
+      transform-origin: left center;
+      opacity: 0;
+    }
+    .completing .task-text { color: hsl(var(--muted-foreground)); }
+    .completing .task-text::after { animation: strike-sweep .34s ease-out forwards; }
+    .completing .toggle {
+      background-color: hsl(var(--primary));
+      border-color: hsl(var(--primary));
+      color: hsl(var(--primary-foreground));
+      animation: toggle-pop .36s ease-out;
+    }
+    @keyframes strike-sweep {
+      0% { transform: scaleX(0); opacity: .85; }
+      100% { transform: scaleX(1); opacity: .6; }
+    }
+    @keyframes toggle-pop {
+      0% { transform: scale(1); }
+      45% { transform: scale(1.28); }
+      100% { transform: scale(1); }
+    }
+    .particle-layer { position: absolute; inset: 0; pointer-events: none; }
+    .particle {
+      position: absolute;
+      width: 5px;
+      height: 5px;
+      margin: -2.5px 0 0 -2.5px;
+      border-radius: 999px;
+      background-color: hsl(var(--primary));
+      animation: particle-fly .52s cubic-bezier(.22, .7, .36, 1) forwards;
+    }
+    .particle:nth-child(3n) {
+      width: 4px;
+      height: 4px;
+      background-color: hsl(var(--accent-foreground));
+      opacity: .55;
+    }
+    @keyframes particle-fly {
+      0% { transform: translate(0, 0) scale(1); opacity: 1; }
+      100% { transform: translate(var(--dx), var(--dy)) scale(.25); opacity: 0; }
+    }
     .toggle-mark { transition: background-color .18s ease, border-color .18s ease, transform .12s ease; }
     .toggle-mark:active { transform: scale(.9); }
     .progress-fill { transition: width .32s ease-out; }
@@ -636,6 +685,56 @@
         el.completeAll.classList.toggle('cursor-not-allowed', el.completeAll.disabled);
       }
 
+      function prefersReducedMotion() {
+        return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      }
+
+      function burst(node) {
+        if (prefersReducedMotion()) return;
+        var toggle = node.querySelector('.toggle');
+        if (!toggle) return;
+        var nodeRect = node.getBoundingClientRect();
+        var toggleRect = toggle.getBoundingClientRect();
+        var cx = toggleRect.left - nodeRect.left + toggleRect.width / 2;
+        var cy = toggleRect.top - nodeRect.top + toggleRect.height / 2;
+
+        var layer = document.createElement('span');
+        layer.className = 'particle-layer';
+        layer.setAttribute('aria-hidden', 'true');
+
+        var count = 10;
+        for (var i = 0; i < count; i++) {
+          var p = document.createElement('span');
+          var angle = (Math.PI * 2 * i) / count + Math.random() * 0.35;
+          var dist = 16 + Math.random() * 18;
+          p.className = 'particle';
+          p.style.setProperty('--dx', Math.round(Math.cos(angle) * dist) + 'px');
+          p.style.setProperty('--dy', Math.round(Math.sin(angle) * dist - 6) + 'px');
+          p.style.left = cx + 'px';
+          p.style.top = cy + 'px';
+          p.style.animationDelay = Math.round(Math.random() * 40) + 'ms';
+          layer.appendChild(p);
+        }
+
+        node.appendChild(layer);
+        setTimeout(function () {
+          if (layer.parentNode) layer.parentNode.removeChild(layer);
+        }, 760);
+      }
+
+      function completeWithFlair(node, task) {
+        if (node.classList.contains('completing')) return;
+        node.classList.add('completing');
+        burst(node);
+
+        var next = tasksOf(state.date).map(function (t) {
+          return t.id === task.id ? Object.assign({}, t, { done: true }) : t;
+        });
+        saveTasks(state.date, next);
+
+        setTimeout(render, prefersReducedMotion() ? 0 : 420);
+      }
+
       function addTask(text, due, cat) {
         var list = tasksOf(state.date);
         list.push({
@@ -893,7 +992,14 @@
         var task = tasksOf(state.date).filter(function (t) { return t.id === id; })[0];
         if (!task) return;
 
-        if (toggle) updateTask(id, { done: !task.done });
+        if (toggle) {
+          if (node.classList.contains('completing')) return;
+          if (task.done) {
+            updateTask(id, { done: false });
+          } else {
+            completeWithFlair(node, task);
+          }
+        }
         if (removeBtn) removeTask(id);
         if (editBtn) startEdit(node, task);
         if (dueBtn) startDueEdit(node, task);
@@ -961,7 +1067,16 @@
           return t.done ? t : Object.assign({}, t, { done: true });
         });
         saveTasks(state.date, list);
-        render();
+
+        var animated = false;
+        Array.prototype.forEach.call(el.list.querySelectorAll('.task-item'), function (node) {
+          if (node.classList.contains('completing')) return;
+          node.classList.add('completing');
+          burst(node);
+          animated = true;
+        });
+
+        setTimeout(render, animated && !prefersReducedMotion() ? 420 : 0);
       });
 
       function shiftDay(offset) {
