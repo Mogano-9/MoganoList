@@ -42,33 +42,59 @@
     /* ===== DESIGN-TOKENS:BEGIN ===== */
     :root {
       --radius: 0.75rem;
-      --background: 100 100% 100%;
-      --foreground: 30 14% 15%;
+      --background: 110 32% 95%;
+      --foreground: 152 24% 14%;
       --card: 0 0% 100%;
-      --card-foreground: 30 14% 15%;
-      --primary: 158 30% 24%;
-      --primary-foreground: 40 30% 96%;
-      --secondary: 40 22% 93%;
-      --secondary-foreground: 30 14% 15%;
-      --muted: 40 20% 94%;
-      --muted-foreground: 30 8% 40%;
-      --accent: 44 72% 89%;
-      --accent-foreground: 30 14% 15%;
+      --card-foreground: 152 24% 14%;
+      --primary: 152 36% 26%;
+      --primary-foreground: 110 40% 96%;
+      --secondary: 110 24% 91%;
+      --secondary-foreground: 152 24% 14%;
+      --muted: 110 22% 92%;
+      --muted-foreground: 150 12% 36%;
+      --accent: 98 50% 86%;
+      --accent-foreground: 152 24% 14%;
+      --border: 122 18% 84%;
+      --input: 122 18% 84%;
+      --ring: 152 36% 26%;
       --danger: 355 62% 40%;
       --danger-foreground: 0 0% 100%;
-      --border: 36 18% 87%;
-      --input: 36 18% 87%;
-      --ring: 158 30% 24%;
     }
     /* ===== DESIGN-TOKENS:END ===== */
 
     /* ===== APP-CSS:BEGIN ===== */
-    html { scroll-behavior: smooth; }
+    html {
+      scroll-behavior: smooth;
+      background-color: hsl(var(--background));
+      background-image: url("assets/landscape-green.jpg");
+      background-size: cover;
+      background-position: center top;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+    }
     body {
-      background-image:
-        radial-gradient(hsl(36 18% 87% / .55) 1px, transparent 1px);
-      background-size: 22px 22px;
-      background-position: -1px -1px;
+      background: transparent;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background: linear-gradient(180deg,
+        hsl(var(--background) / .62) 0%,
+        hsl(var(--background) / .84) 42%,
+        hsl(var(--background) / .93) 100%);
+    }
+    .glass {
+      background-color: hsl(var(--card) / .82);
+      -webkit-backdrop-filter: blur(10px) saturate(1.04);
+      backdrop-filter: blur(10px) saturate(1.04);
+    }
+    .glass-soft {
+      background-color: hsl(var(--card) / .66);
+      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
     }
     .task-item { animation: rise .28s ease-out both; }
     @keyframes rise {
@@ -107,9 +133,9 @@
     /* ===== APP-CSS:END ===== */
   </style>
 </head>
-<body class="bg-background text-foreground antialiased min-h-screen flex flex-col">
+<body class="text-foreground antialiased min-h-screen flex flex-col">
 
-  <header id="site-header" class="border-b border-border">
+  <header id="site-header" class="glass-soft border-b border-border">
     <div class="container flex items-center justify-between gap-4 py-4">
       <div class="flex items-center gap-3">
         <span class="grid place-items-center h-9 w-9 rounded-md bg-primary text-primary-foreground font-semibold text-sm tracking-tight">M</span>
@@ -157,7 +183,7 @@
     </section>
 
     <section id="task-board" class="container pb-14">
-      <div class="rounded-lg border border-border bg-card shadow-sm">
+      <div class="glass rounded-lg border border-border shadow-sm">
         <div class="p-4 md:p-5 border-b border-border">
           <form id="add-form" class="flex flex-col md:flex-row md:items-center gap-2" autocomplete="off">
             <input id="task-input" type="text" maxlength="120" placeholder="写下一件今天要做的事…"
@@ -194,7 +220,7 @@
         <ul id="task-list" class="divide-y divide-border"></ul>
 
         <div id="empty-state" class="hidden px-6 py-14 text-center">
-          <svg class="mx-auto" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: hsl(30 8% 62%)">
+          <svg class="mx-auto text-muted-foreground" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <rect x="4" y="3.5" width="16" height="17" rx="2.5"/>
             <path d="M8 8.5h5M8 12h8M8 15.5h6"/>
           </svg>
@@ -207,7 +233,7 @@
     </section>
   </main>
 
-  <footer id="site-footer" class="border-t border-border">
+  <footer id="site-footer" class="glass-soft border-t border-border">
     <div class="container py-5 flex flex-col md:flex-row md:items-center justify-between gap-2">
       <p class="text-xs text-muted-foreground">Mogano List · 一个不打扰你的每日清单</p>
       <p class="text-xs text-muted-foreground">拖动任务左侧圆点可调整顺序 · 双击任务文字可直接修改 · 悬停任务可设置截止日期</p>
@@ -628,6 +654,12 @@
         if (!drag) return;
         e.preventDefault();
         drag.ghost.style.top = (e.clientY - drag.offsetY) + 'px';
+
+        if (e.clientY > window.innerHeight - 70) {
+          window.scrollBy(0, 14);
+        } else if (e.clientY < 70) {
+          window.scrollBy(0, -14);
+        }
 
         var hit = document.elementFromPoint(e.clientX, e.clientY);
         var over = hit && hit.closest ? hit.closest('.task-item') : null;
